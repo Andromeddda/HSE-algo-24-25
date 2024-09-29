@@ -1,566 +1,267 @@
-#include <cstdio>
+// #include <cstdio>
 #include <cstdlib>
-#include <cstring>
-#include <assert.h>
+// #include <cstring>
+// #include <assert.h>
 
+#include <cctype>
+
+// streams
 #include <iostream>
+#include <istream>
+#include <ostream>
+
+// containers
 #include <string>
+#include <vector>
 #include <utility>
-#include <optional>
 
-/* 
- * Iterable binary search tree based on doubly-linked list	
-*/
-template<class K, class V>  
-class SearchingTree 
-{
-private:
-	struct ListNode 
-	{
-		std::optional<std::pair<K, V>> element;
-		ListNode* prev;
-		ListNode* next;
+#define CHAR_TO_INT(c) ((digit_t)(c - '0'))
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
+#define MIN(a, b) ((a) < (b) ? (a) : (b))
 
-		ListNode() : element(), prev(nullptr), next(nullptr) {}
-		ListNode(K k, V v): element(std::pair<K, V>(k, v)), prev(nullptr), next(nullptr) {}
-	};
+using namespace std;
 
-	struct TreeNode 
-	{
-		ListNode* list_node;
-		TreeNode* right;
-		TreeNode* left;
+typedef long long digit_t;
+typedef vector<digit_t> Number;
 
-		TreeNode() : list_node(nullptr), right(nullptr), left(nullptr) {};
-	};
+const digit_t base = 1000000;
+const digit_t char_base = 10;
+const size_t digit_length = 6;
+const size_t naive_size = 16;
 
-	size_t size_;
+// Console utils
+pair<Number, bool> read_number(istream& is);
+void               print_number(const Number& x, bool sign, ostream& os);
 
-	// List node, that points to the first element
-	ListNode* begin_;
+// Karatsuba
+void                    normalize(Number& x);
+Number                  Karatsuba(const Number& X, const Number& Y);
+pair<digit_t, digit_t>  mod(digit_t dividor, digit_t divisor);
 
-	// Utility list node, that points to the element after the last element
-	// begin == end means empty containers
-	ListNode* end_;
+// Basic operations
+Number subtract(const Number& x, const Number& y);
+Number add(const Number& x, const Number& y);
+Number naive_multiplication(const Number& x, const Number& y);
 
-	TreeNode* root_;
-
-	void free_node(TreeNode* node);
-	TreeNode* find_min_right_parent(TreeNode* subtree_root);
-
-	
-public:
-	SearchingTree();
-	SearchingTree(const SearchingTree &other);
-	SearchingTree(SearchingTree &&other);
-	~SearchingTree();
-
-	class iterator 
-	{
-	private:
-		friend class SearchingTree;
-		ListNode* node_;
-
-		// Utility pointers for iterating in specific range
-		ListNode* begin_;
-		ListNode* end_;
-
-        iterator(ListNode *node,
-                 ListNode *begin, ListNode *end)
-            : node_(node), begin_(begin),
-              end_(end) { }
-	public:
-		iterator() : node_(nullptr), begin_(nullptr), end_(nullptr) {}
-		iterator(const iterator &other) = default; // copy constructor
-		iterator(iterator &&other) = default;      // move constructor
-		iterator operator ++();          // iterate forward
-		iterator operator --();		     // iterate backward
-		bool   	 operator== (const iterator &other); // compare two iterators
-		bool 	 operator!= (const iterator &other); // compare two iterators
-		std::pair<K, V>& operator* (); // dereference
-		std::pair<K, V>* operator-> (); // dereference
-	};
-
-	class Range 
-	{
-	private:
-		friend class SearchingTree;
-		iterator begin_;
-		iterator end_;
-
-		Range() = delete;
-		Range(
-			iterator begin,
-			iterator end) : 
-		begin_(begin), end_(end) {
-		}
-
-	public:
-		iterator begin();
-		iterator end();
-	};
-
-
-	iterator 
-	begin();
-
-	iterator 
-	end();
-
-	iterator 
-	begin() const;
-
-	iterator 
-	end() const;
-
-    void
-    insert(const K &key, const V &value);
-
-    void 
-    erase(const K &key);
-    
-    iterator
-    find(const K &key) const;
-
-    Range 
-    range(const K &min, const K& max) const;
-
-    V&
-    at(const K &key);
-
-    V& 
-    operator[] (const K &key);
-};
-
-// ===============================
-// ===== Tree Implementation =====
-// ===============================
-
-template<class K, class V>
-SearchingTree<K, V>::SearchingTree() : size_(0) {
-	root_ = new TreeNode();
-	end_ = new ListNode();
-	begin_ = end_;
-
-	root_->list_node = begin_;
+int 
+main(void) {
+    // test_karatsuba();
+    pair<Number, bool> x = read_number(cin);
+    pair<Number, bool> y = read_number(cin);
+    print_number(Karatsuba(x.first, y.first), x.second ^ y.second, cout);
 }
 
-template<class K, class V>
+
+pair<Number, bool>
+read_number(istream& is) {
+    string str;
+    is >> str;
+
+    auto res = Number();
+
+    int digit = 0;
+    digit_t power = 1;
+
+    // go from back
+    for (int i = (int)str.size() - 1; i >= 0; i--) {
+        if (!isdigit(str[i]))
+            break;
+
+        digit += CHAR_TO_INT(str[i]) * power;
+        power *= char_base;
+
+        if (power == base) {
+            res.push_back(digit);
+            digit = 0;
+            power = 1;
+        }
+    }
+
+    if (digit)
+        res.push_back(digit);
+
+    normalize(res);
+
+    return pair<Number, bool>(res, str[0] == '-');
+}
+
+
 void
-SearchingTree<K, V>::free_node(TreeNode* node) {
-	if (!node)
-		return;
+print_number(const Number& x, bool sign, ostream& os) {
+    if(x.size() == 1 && x[0] == 0) {
+        cout << "0\n";
+        return;
+    }
+    // print the sign
+    if (sign)
+        os << '-';
 
-	if (node->right)
-		free_node(node->right);
+    bool extend = false;
 
-	if (node->left)
-		free_node(node->left);
+    int i = (int)x.size() - 1;
 
-	delete node->list_node;
-	delete node;
+    // skip leading zeros
+    while (!x[i])
+        i--;
+
+    for (; i >= 0; i--) {
+        string str_digit = to_string(x[i]);
+        if ((str_digit.size() < digit_length) && extend) {
+            str_digit = string(digit_length - str_digit.size(), '0') + str_digit;
+        }
+
+        os << str_digit;
+        extend = true;
+    }
+    cout << '\n';
 }
 
-template<class K, class V>
-SearchingTree<K, V>::~SearchingTree() {
-	free_node(root_);
+Number
+naive_multiplication(const Number& x, const Number& y) {
+    // cases of zero
+    if (!x.size() || !y.size())
+        return Number(1, 0);
+    if (x.size() == 1 && x[0] == 0)
+        return Number(1, 0);
+    if (y.size() == 1 && y[0] == 0)
+        return Number(1, 0);
+
+    size_t size = x.size() + y.size();
+
+    auto res = Number(size, 0);
+    for (auto i = 0LU; i < x.size(); ++i) {
+        for (auto j = 0LU; j < y.size(); ++j) {
+            res[i + j] += x[i] * y[j];
+        }
+    }
+
+    normalize(res);
+    return res;
 }
 
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::begin() {
-	return iterator(begin_, begin_, end_);
+void 
+normalize(Number& x) {
+    // normalize digits
+    x.push_back(0);
+    for (auto i = 0LU; i < x.size() - 1; ++i) {
+        auto m = mod(x[i], base);
+        x[i + 1] += m.first;
+        x[i] = m.second;
+    }
+
+    // delete leading zeros
+    while(!x[x.size() - 1])
+        x.pop_back();
 }
 
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::end() {
-	return iterator(end_, begin_, end_);
+pair<digit_t, digit_t>
+mod(digit_t dividor, digit_t divisor) {
+    if (divisor < 0)
+        exit(-1);
+
+    auto res = 
+        pair<digit_t, digit_t>(dividor / divisor, dividor % divisor);
+
+    if (dividor < 0) {
+        res.first--;
+        res.second += divisor;
+    }
+    return res;
 }
 
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::begin() const {
-	return iterator(begin_, begin_, end_);
+Number 
+Karatsuba(const Number& X, const Number& Y) {
+    Number x = Number(X);
+    Number y = Number(Y);
+
+    // cases of zero
+    if (!x.size() || !y.size())
+        return Number(1, 0);
+    if (x.size() == 1 && x[0] == 0)
+        return Number(1, 0);
+    if (y.size() == 1 && y[0] == 0)
+        return Number(1, 0);
+
+    size_t size = MAX(x.size(), y.size());
+
+    if (size < naive_size) {
+        return naive_multiplication(x, y);
+    }
+
+    size_t k = size / 2;
+
+    // Split vectors in two parts
+    auto mid_x = (x.size() > k) ? (x.begin() + k) : x.end();
+    auto mid_y = (y.size() > k) ? (y.begin() + k) : y.end();
+
+    Number Xl {x.begin(), mid_x};
+    Number Xr {mid_x, x.end()};
+    Number Yl {y.begin(), mid_y};
+    Number Yr {mid_y, y.end()};
+
+    Number P1 = Karatsuba(Xl, Yl);
+    Number P2 = Karatsuba(Xr, Yr);
+
+    Number Xlr = add(Xl, Xr);
+    Number Ylr = add(Yl, Yr);
+
+    // Calculate P3
+    Number P3 = subtract(subtract(Karatsuba(Xlr, Ylr), P1), P2);
+
+    P2.insert(P2.begin(), 2*k, 0);
+    P3.insert(P3.begin(), k, 0);
+
+    Number res = add(add(P1, P3), P2);
+
+    normalize(res);
+    return res;
 }
 
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::end() const {
-	return iterator(end_, begin_, end_);
+Number 
+add(const Number& x, const Number& y) {
+    size_t size = MAX(x.size(), y.size());
+    auto res = Number();
+
+    digit_t overload = 0;
+    for (size_t i = 0; i < size; i++) {
+        digit_t sum = overload;
+        if (i < x.size()) sum += x[i];
+        if (i < y.size()) sum += y[i];
+
+        overload = sum / base;
+        sum %= base;
+        res.push_back(sum);
+    }
+
+    if (overload)
+        res.push_back(overload);
+
+    return res;
 }
 
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::find(const K &key) const {
-	TreeNode* dummy = root_;
-	while (dummy) {
-		if (key == dummy->list_node->element.value().first)
-			return iterator(dummy->list_node, begin_, end_);
+Number 
+subtract(const Number& x, const Number& y) {
+    size_t size = MAX(x.size(), y.size());
 
-		if (key < dummy->list_node->element.value().first){
-			dummy = dummy->left;
-			continue;
-		}
+    Number res = Number();
 
-		if (dummy->list_node->element.value().first < key){
-			dummy = dummy->right;
-			continue;
-		}
+    digit_t loan = 0;
+    for (size_t i = 0; i < size; i++) {
+        digit_t diff = -loan;
+        if (i < x.size()) diff += x[i];
+        if (i < y.size()) diff -= y[i];
 
-	}
+        loan = 0;
+        if (diff < 0) {
+            loan = 1;
+            diff += base;
+        }
 
-	return iterator(end_, begin_, end_);
+        res.push_back(diff);
+    }
+
+    while (!res[res.size() - 1])
+        res.pop_back();
+
+    return res;
 }
-
-template<class K, class V>
-SearchingTree<K, V>::Range
-SearchingTree<K, V>::range(const K &min, const K& max) const {
-	if (max < min)
-		return Range(iterator(end_, begin_, end_), iterator(end_, begin_, end_));
-	if (!size_)
-		return Range(iterator(end_, begin_, end_), iterator(end_, begin_, end_));
-
-	TreeNode* low = root_;
-
-	// find lower bound
-	while (low) {
-		if (low->list_node->element.value().first == min)
-			break;
-
-		if (min < low->list_node->element.value().first) {
-			if (!low->left)
-				break;
-			low = low->left;
-			continue;
-		}
-
-		if (!low->right) {
-			low = nullptr;
-			break;
-		}
-
-		low = low->right;
-	}
-
-	TreeNode* up = root_;
-
-	// find upper bound
-	while (up) {
-		if (up->list_node->element.value().first == max)
-			break;
-
-		if (up->list_node->element.value().first < max) {
-			if (!up->right)
-				break;
-			up = up->right;
-			continue;
-		}
-
-		if (!up->left) {
-			up = nullptr;
-			break;
-		}
-
-		up = up->left;
-	}
-
-	if (!up || !low)
-		return Range(iterator(end_, begin_, end_), iterator(end_, begin_, end_));
-
-	iterator end = iterator(up->list_node, low->list_node, up->list_node->next);
-	++end;
-
-	return Range(iterator(low->list_node, low->list_node, up->list_node->next), end);
-}
-
-
-template<class K, class V>
-void
-SearchingTree<K, V>::insert(const K &key, const V &value) {
-	// if empty, assign root
-	if (size_ == 0) {
-		root_->list_node = new ListNode(key, value);
-
-		begin_ = root_->list_node;
-
-		root_->list_node->next = end_;
-		end_->prev = root_->list_node;
-		size_++;
-		return;
-	}
-
-	TreeNode* dummy = root_;
-
-	while (dummy) {
-		if (key == dummy->list_node->element.value().first)
-			return;
-
-		if (key < dummy->list_node->element.value().first) {
-			if (dummy->left) {
-				dummy = dummy->left;
-				continue;
-			}
-			// Allocate new nodes
-			dummy->left = new TreeNode();
-			dummy->left->list_node = new ListNode(key, value);
-			ListNode* current = dummy->left->list_node;
-
-			// Link next pointers in the list
-			current->next = dummy->list_node;
-			current->prev = dummy->list_node->prev;
-			dummy->list_node->prev = current;
-
-			if (current->prev)
-				current->prev->next = current;
-
-			if (dummy->list_node == begin_)
-				begin_ = current;
-
-			size_++;
-			return;
-		}
-		else {
-			if (dummy->right) {
-				dummy = dummy->right;
-				continue;
-			}
-			// Allocate new nodes
-			dummy->right = new TreeNode();
-			dummy->right->list_node = new ListNode(key, value);
-			ListNode* current = dummy->right->list_node;
-
-			// Link next pointers in the list
-			current->prev = dummy->list_node;
-			current->next = dummy->list_node->next;
-			dummy->list_node->next = current;
-
-			if (current->next)
-				current->next->prev = current;
-
-			size_++;
-			return;
-		}
-	}
-}
-
-template<class K, class V>
-void
-SearchingTree<K, V>::erase(const K &key) {
-	if (size_ == 0)
-		return;
-
-	if (size_ == 1) {
-		delete root_->list_node;
-		begin_ = end_;
-		size_--;
-		root_->list_node = begin_;
-		return;
-	}
-
-	TreeNode* dummy = root_;
-	TreeNode* parent = nullptr;
-
-	while(dummy) {
-		// if less, search in left subtree
-		if (key < dummy->list_node->element.value().first) {
-			parent = dummy;
-			dummy = dummy->left;
-			continue;
-		}
-		
-		// if greater, search in right subtree
-		if (dummy->list_node->element.value().first < key) {
-			parent = dummy;
-			dummy = dummy->right;
-			continue;
-		}
-
-		// relink the list
-		if (dummy->list_node->prev)
-			dummy->list_node->prev->next = dummy->list_node->next;
-		if (dummy->list_node->next)
-			dummy->list_node->next->prev = dummy->list_node->prev;
-
-		if (dummy->list_node == begin_)
-			begin_ = dummy->list_node->next;
-		delete dummy->list_node;
-
-
-		// if both children are empty, just erase node
-		if (!dummy->right && !dummy->left) {
-			delete dummy;
-			size_--;
-			return;
-		}
-
-		// only right child is empty
-		if (!dummy->right) {
-			TreeNode* left = dummy->left;
-			delete dummy;
-
-			// replace it with left subtree
-			if (!parent) {
-				root_ = left;
-				size_--;
-				return;
-			}
-			
-			if (parent->list_node->element.value().first > left->list_node->element.value().first)
-				parent->left = left;
-			else
-				parent->right = left;
-			size_--;
-			return;
-		}
-		// only left child is empty
-		if (!dummy->left) {
-			TreeNode* right = dummy->right;
-			delete dummy;
-
-			if (!parent) {
-				root_ = right;
-				size_--;
-				return;
-			}
-
-			// replace it with the right subtree
-			if (parent->list_node->element.value().first < right->list_node->element.value().first)
-				parent->right = right;
-			else
-				parent->left = right;
-			size_--;
-			return;
-		}
-
-		// both children are non-empty
-
-		// find the parent of min element in the right subtree
-		TreeNode* min_right_parent = find_min_right_parent(dummy);
-		TreeNode* min_right = min_right_parent->left;
-
-		TreeNode* right_subtree = dummy->right;
-		
-		min_right_parent->left = nullptr;
-		min_right->right = right_subtree;
-		delete dummy;
-
-		// replace it with min_right
-		if (!parent) {
-			root_ = min_right;
-			size_--;
-			return;
-		}
-
-		if (parent->list_node->element.value().first > min_right->list_node->element.value().first)
-			parent->left = min_right;
-		else
-			parent->right = min_right;
-		size_--;
-		return;
-	}
-}
- 
-template<class K, class V>
-SearchingTree<K, V>::TreeNode*
-SearchingTree<K, V>::find_min_right_parent(TreeNode* subtree_root) {
-	TreeNode* parent = subtree_root;
-
-	assert(parent->right);
-
-	TreeNode* dummy = subtree_root->right;
-
-	while (dummy) {
-		if (!dummy->left)
-			return parent;
-		parent = dummy;
-		dummy = dummy->left;
-	}
-	return dummy;
-}
-
-// ===================================
-// ===== Iterator Implementation =====
-// ===================================
-
-
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::iterator::operator ++() {
-	assert(node_ != end_);
-	assert(node_->next != nullptr);
-
-	node_ = node_->next;
-	return *this;
-}
-
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::iterator::operator --() {
-	assert(node_ != begin_);
-	assert(node_->prev != nullptr);
-	
-	node_ = node_->prev;
-	return *this;
-}
-
-template<class K, class V>
-bool
-SearchingTree<K, V>::iterator::operator==(const SearchingTree<K, V>::iterator &other) {
-	return (node_ == other.node_);
-}
-
-template<class K, class V>
-bool
-SearchingTree<K, V>::iterator::operator!=(const SearchingTree<K, V>::iterator &other) {
-	return (node_ != other.node_);
-}
-
-template<class K, class V>
-std::pair<K, V>&
-SearchingTree<K, V>::iterator::operator* () {
-	return node_->element.value();
-}
-
-template<class K, class V>
-std::pair<K, V>*
-SearchingTree<K, V>::iterator::operator-> () {
-	return &node_->element.value();
-}
-
-// ================================
-// ===== Range Implementation =====
-// ================================
-
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::Range::begin() {
-	return begin_;
-}
-
-template<class K, class V>
-SearchingTree<K, V>::iterator
-SearchingTree<K, V>::Range::end() {
-	return end_;
-}
-
-#define LOCAL
-
-#ifdef LOCAL
-// #define private public
-
-int main(void) {
-
-	auto tree = SearchingTree<int, int>();
-	tree.insert(3, 3);
-	tree.insert(2, 2);
-	tree.insert(1, 1);
-	tree.erase(3);
-
-	for (auto &[k, v] : tree.range(-10, 10)) {
-		std::cout << v << ' ';
-	}
-	return 0;
-}
-
-#endif
