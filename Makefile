@@ -128,22 +128,29 @@ gdb: $(RUN_EXECUTABLE) Makefile
 
 SOLVED = solved
 
-solved: $(RUN_EXECUTABLE) Makefile
+solved: all Makefile
 	mkdir -p $(SOLVED)/
 	cp	$(SRCDIR)/$(RUN).cpp $(SOLVED)/
 	mv 	$(SOLVED)/$(RUN).cpp $(SOLVED)/$(SOLVED_ARGS).cpp
 	git add $(SOLVED)/$(SOLVED_ARGS).cpp
-	git commit -m "solved: $(SOLVED_ARGS)"
+	git commit -m "[AUTOMATIC] solved: $(SOLVED_ARGS)"
 	git push origin master
 
 STASH = stash
 
-stash: $(RUN_EXECUTABLE) Makefile
+stash: all Makefile
 	mkdir -p $(STASH)/
 	cp	$(SRCDIR)/$(RUN).cpp $(STASH)/
 	mv 	$(STASH)/$(RUN).cpp $(STASH)/$(STASH_ARGS).cpp
 	git add $(STASH)/$(STASH_ARGS).cpp
 	git commit -m "$(STASH): $(STASH_ARGS)"
+	git push origin master
+
+sync: all Makefile
+	git add --all
+	git commit -m "[AUTOMATIC] Synchronize remote and local"
+	git pull origin master
+	git merge -m "[AUTOMATIC] Merge remote and local" master origin/master
 	git push origin master
 
 #-------
@@ -157,4 +164,4 @@ clean:
 	rm -f programs/*.bcode
 
 # List of non-file targets:
-.PHONY: clean run solved stash gdb
+.PHONY: clean run solved stash sync push gdb
