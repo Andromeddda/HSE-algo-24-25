@@ -150,7 +150,7 @@ sync: all Makefile
 	git add --all
 	git commit -m "[AUTOMATIC] Synchronize remote and local"
 	git pull origin master
-	git merge -m "[AUTOMATIC] Merge remote and local" master origin/master
+	git merge -m "[AUTOMATIC] Merge remote and local" origin/master
 	git push origin master
 
 #-------
