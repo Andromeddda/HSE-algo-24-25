@@ -3,7 +3,7 @@
 #include <string>
 
 #include <algorithm>
-#include <random>
+// #include <random>
 
 #include <map>
 #include <set>
@@ -25,48 +25,28 @@
 
 using namespace std;
 
-#define INF 1441
-#define LIMIT 1440
+#define TIME_LIMIT 1440
+#define TRUCK_WEIGHT (3000000LLU)
+#define CUP_WEIGHT (100LLU)
+#define TOTAL_CUPS (10000000LLU)
 
-
-struct Path
-{
-    int to, cups, time;
-    Path(int v, int c, int t) : to(v), cups(c), time(t) {}
-
-    Path() : to(-1), cups(0), time(INF) {}
-    Path(const Path& other) = default;
-    Path(Path&& other) = default;
-    Path& operator=(const Path& other) = default;
-    Path& operator=(Path&& other) = default;
-
-    bool operator== (const Path& other) {
-        return to == other.to && cups == other.cups;
-    }
-};
-
-bool operator< (const Path& lhs, const Path& rhs) { 
-    if (lhs.time > LIMIT) return false;
-    if (rhs.time > LIMIT) return true;
-    return lhs.cups > rhs.cups;
-}
+typedef int minutes_t;
+typedef unsigned long long int cups_t;
 
 struct Graph
 {
     const int V;
-    vector<vector<array<int, 3>>> neighbours;
+    vector<vector<pair<int, pair<cups_t, minutes_t>>>> neighbours;
 
     Graph() = delete;
     Graph(int v) : V(v), neighbours(v) {}
 
-    void add_edge(int from, int to, int cups, int time) {
-        array<int, 3> first {{to, cups, time}};
-        array<int, 3> second {{from, cups, time}};
-        neighbours[from].push_back(first);
-        neighbours[to].push_back(second);
+    void add_edge(int from, int to, cups_t cups, minutes_t time) {
+        neighbours[from].push_back(make_pair(to, make_pair(cups, time)));
+        neighbours[to].push_back(make_pair(from, make_pair(cups, time)));
     }
 
-    vector<int> Dijkstra(int root);
+    vector<cups_t> Dijkstra(int root);
 };
 
 
@@ -79,18 +59,22 @@ int main(void)
 
     for (int i = 0; i < Edges; i++)
     {
-        int v1, v2, time, weight;
+        int v1, v2;
+        minutes_t time;
+        cups_t weight;
+
         cin >> v1 >> v2 >> time >> weight;
         --v1;
         --v2;
 
         // calculate cups from weight
-        int cups;
-        if (weight < 3000000) 
+        cups_t cups;
+        if (weight < TRUCK_WEIGHT) 
             cups = 0;
         else
-            cups = (weight - 3000000) / 100;
+            cups = (weight - TRUCK_WEIGHT) / CUP_WEIGHT;
 
+        // add edge
         graph.add_edge(v1, v2, cups, time);
     }
 
@@ -102,52 +86,61 @@ int main(void)
 }
 
 
-vector<int> Graph::Dijkstra(int root)
+vector<cups_t> Graph::Dijkstra(int root)
 {
     // result - max cups from root to vertex
-    vector<int> distances(V, 0);
-    distances[root] = 10000000;
+    vector<cups_t> cups(V, 0);
+    cups[root] = TOTAL_CUPS;
+
+    vector<minutes_t> time(V, TIME_LIMIT + 1);
+    time[root] = 0;
 
     // Priority queue of relaxations
-    set<Path> relaxation_queue;
+    set<pair<cups_t, int>> relaxation_queue;
 
-    relaxation_queue.insert(Path{root, 10000000, 0});
+    relaxation_queue.insert(make_pair(TOTAL_CUPS, root));
 
     while (!relaxation_queue.empty())
     {
-        // Go to the nearest vertex and erase it from queue
-        int current = relaxation_queue.begin()->to;
-        int cur_time = relaxation_queue.begin()->time;
-
-        relaxation_queue.erase(relaxation_queue.begin());
-
-        if (cur_time > LIMIT)
-            continue;
+        // Go to the road with max weight limit
+        auto It = relaxation_queue.end();
+        --It;
+        int current = It->second;
+        relaxation_queue.erase(It);
 
         // Iterate through its neighbours
         for (auto i = 0LU; i < neighbours[current].size(); i++)
         {
-            int neighbour = neighbours[current][i][0];
-            int cups = neighbours[current][i][1];
-            int time = neighbours[current][i][2];
+            int neighbour = neighbours[current][i].first;
+            cups_t cup_limit = neighbours[current][i].second.first;
+            time_t road_time = neighbours[current][i].second.second;
 
-            if (time + cur_time > LIMIT)
-                continue;
+            time_t time_if_we_update_this_road = time[current] + road_time; 
+
+            if (time_if_we_update_this_road > TIME_LIMIT)
+                continue; // dont update anyway
 
             // Update distance to every neighbour
-            if (distances[neighbour] < min(distances[current], cups)) 
+            if (cups[neighbour] < min(cups[current], cup_limit)) 
             {
                 // erase old distance-vertex pair
-                relaxation_queue.erase(Path(neighbour, distances[neighbour], INF));
+                relaxation_queue.erase({cups[neighbour], neighbour});
 
                 // update distance
-                distances[neighbour] = min(distances[current], cups);
+                cups[neighbour] = min(cups[current], cup_limit);
 
                 // insert new distance-vertex pair
-                relaxation_queue.insert(Path(neighbour, distances[neighbour], time + cur_time));
+                relaxation_queue.insert({cups[neighbour], neighbour});
+
+                time[neighbour] = time_if_we_update_this_road;
             }
         }
     }
 
-    return distances;
+
+    for (int i = 0; i < V; i++)
+        if (time[i] > TIME_LIMIT)
+            cups[i] = 0;
+
+    return cups;
 }
