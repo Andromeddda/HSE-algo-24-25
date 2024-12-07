@@ -134,6 +134,8 @@ solved: all Makefile
 	mv 	$(SOLVED)/$(RUN).cpp $(SOLVED)/$(SOLVED_ARGS).cpp
 	git add $(SOLVED)/$(SOLVED_ARGS).cpp
 	git commit -m "[AUTOMATIC] solved: $(SOLVED_ARGS)"
+	git checkout master
+	git merge develop -m "merge develop"
 	git push origin master
 
 STASH = stash
@@ -144,14 +146,8 @@ stash: all Makefile
 	mv 	$(STASH)/$(RUN).cpp $(STASH)/$(STASH_ARGS).cpp
 	git add $(STASH)/$(STASH_ARGS).cpp
 	git commit -m "$(STASH): $(STASH_ARGS)"
-	git push origin master
+	git push origin develop
 
-sync: all Makefile
-	git add --all
-	git commit -m "[AUTOMATIC] Synchronize remote and local"
-	git pull origin master
-	git merge -m "[AUTOMATIC] Merge remote and local" origin/master
-	git push origin master
 
 #-------
 # Other
@@ -159,9 +155,7 @@ sync: all Makefile
 
 clean:
 	@printf "$(BYELLOW)Cleaning build and resource directories$(RESET)\n"
-	rm -rf res
 	rm -rf $(BUILD)
-	rm -f programs/*.bcode
 
 # List of non-file targets:
-.PHONY: clean run solved stash sync push gdb
+.PHONY: clean run solved stash push gdb
