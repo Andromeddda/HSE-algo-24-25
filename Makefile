@@ -21,7 +21,7 @@ CFLAGS = \
 	-Wall \
 	-Werror \
 	-Wextra \
-	-std=c++11 \
+	-std=c++20 \
 	-O0 \
 	-fpermissive \
 	-g \
