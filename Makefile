@@ -134,9 +134,6 @@ solved: all Makefile
 	mv 	$(SOLVED)/$(RUN).cpp $(SOLVED)/$(SOLVED_ARGS).cpp
 	git add $(SOLVED)/$(SOLVED_ARGS).cpp
 	git commit -m "[AUTOMATIC] solved: $(SOLVED_ARGS)"
-	git checkout master
-	git merge develop -m "merge develop"
-	git push origin master
 
 STASH = stash
 

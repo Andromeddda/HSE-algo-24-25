@@ -1,52 +1,114 @@
-#include <cstdio>
-#include <cstdlib>
-// #include <cstring>
-// #include <assert.h>
-
-#include <cctype>
-
-// streams
+// I/O
 #include <iostream>
-#include <istream>
-#include <ostream>
+#include <fstream>
+#include <cstdio>
 
 // containers
 #include <string>
 #include <vector>
+#include <unordered_map>
+#include <unordered_set>
+#include <set>
+#include <list>
 #include <utility>
+#include <stack>
 
-// random
+// runtime
+#include <exception>
+#include <assert.h>
+
+// other
+#include <algorithm>
 #include <random>
-
-// math
+#include <cstdlib>
+#include <climits>
 #include <math.h>
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) < (b) ? (a) : (b))
+#include <memory>
 
 using namespace std;
 
-void play(int n);
+#define INF (INT_MAX)
 
-int 
-main(void) 
+class Graph
 {
-    int m;
-    cin >> m;
+private:
+    int V;
+    int* matrix;
+    int* color;
+public:
+    Graph(int N) 
+    : V(N)
+    { 
+        matrix = new int[N*N];
 
-    for (int i = 0; i < m; i++) {
-        play(i + 2);
+        for (int i = 0; i < N; i++)
+            for (int j = 0; j < N; j++)
+                if (i != j)
+                    matrix[N*i + j] = 0;
     }
+
+    inline ~Graph() { delete[] matrix; }
+
+    void add_edge(int from, int to, int weight) 
+    {
+        matrix[V*from + to] = weight;
+    }
+
+    int cyclic()
+    {
+        color = new int[V];
+        for (int i = 0; i < V; i++)
+            color[i] = 0;
+
+        for (int i = 0; i < V; i++)
+        {
+            if (color[i] == 0)
+                if (dfs(i))
+                    return true;
+        }
+        return false;
+    }
+
+private:
+    bool dfs(int root)
+    {
+        color[root] = 1;
+
+        for (int i = 0; i < V; i++)
+            if (matrix[V*root + i] == 1)
+            {
+                if (color[i] == 0)
+                {
+                    if (dfs(i))
+                        return true;
+                }
+                if (color[i] == 1)
+                    return true;
+            }
+
+        color[root] = 2;
+        return false;
+    }
+};
+
+
+int main(void) 
+{
+    int V;
+    cin >> V;
+
+    Graph graph(V);
+
+    for (int i = 0; i < V; i++)
+        for (int j = 0; j < V; j++)
+        {
+            int w;
+            cin >> w;
+            graph.add_edge(i, j, w);
+        }
+
+    cout << graph.cyclic() << '\n';
 
     return 0;
-}
-
-void play(int n) {
-    for (int i = 1; i <= n; i++) {
-        for (int j = i + 1; j <= n; j++) {
-            printf("? %d %d\n", i, j);
-        }
-    }
-    printf("! %d %d\n", n / 2, n / 2 + 1);
 }
 
